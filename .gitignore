@@ -1,0 +1,19 @@
+# Ignorar archivos y directorios específicos
+dsa.py
+dsada.py
+diagrama_gantt.html
+datos_gantt.xlsx
+mapa_conceptual_acidos_nucleicos
+sda.txt
+sales_chart.html
+sales_graph.html
+dasassaddsa.py
+retention_chart.html
+resumen_costos.csv
+componentes.py
+categories_chart.html
+grafica_pert.png
+stock_chart.html
+profile_pictures/
+.vscode/
+__pycache__
