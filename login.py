@@ -23,8 +23,9 @@ from PyQt6.QtCore import (
     pyqtSignal
 )
 from PyQt6.QtGui import QColor, QIcon, QPainter, QLinearGradient
+import bcrypt
 import sqlite3
-
+import bcrypt
 
 class GradientWidget(QWidget):
     def __init__(self, start_color, end_color, *args, **kwargs):
@@ -114,11 +115,11 @@ class LoginModule(QWidget):
         left_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         logo_label = QLabel()
-        logo_label.setPixmap(QIcon("path_to_your_logo.png").pixmap(QSize(150, 150)))
+        logo_label.setPixmap(QIcon("/icons/logo.png").pixmap(QSize(150, 150)))
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         left_layout.addWidget(logo_label)
 
-        company_name = QLabel("Your Company Name")
+        company_name = QLabel("TriXxo Corp")
         company_name.setStyleSheet("color: white; font-size: 24px; font-weight: bold;")
         company_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         left_layout.addWidget(company_name)
@@ -194,29 +195,30 @@ class LoginModule(QWidget):
         main_layout.addWidget(right_widget)
 
     def attempt_login(self):
-        username = self.username_input.text()
-        password = self.password_input.text()
+            username = self.username_input.text()
+            password = self.password_input.text()
 
-        conn = sqlite3.connect("pos_database.db")
-        c = conn.cursor()
-        c.execute(
-            "SELECT * FROM usuarios WHERE username=? AND password=?",
-            (username, password),
-        )
-        user = c.fetchone()
-        conn.close()
+            conn = sqlite3.connect("pos_database.db")
+            c = conn.cursor()
+            c.execute("SELECT id, password FROM usuarios WHERE username=?", (username,))
+            user = c.fetchone()
+            conn.close()
 
-        if user:
-            user_id = user[0]  # Asumiendo que el id del usuario es el primer campo
-            self.message_label.setText("Login successful!")
-            self.message_label.setStyleSheet("color: #2ecc71; font-size: 16px;")
-            self.animate_success()
-            self.login_success.emit(user_id)  # Emitir la señal aquí
-
-        else:
-            self.message_label.setText("Incorrect username or password")
-            self.message_label.setStyleSheet("color: #e74c3c; font-size: 16px;")
-            self.animate_failure()
+            if user:
+                user_id, hashed_password = user
+                if bcrypt.checkpw(password.encode('utf-8'), hashed_password):
+                    self.message_label.setText("Login successful!")
+                    self.message_label.setStyleSheet("color: #2ecc71; font-size: 16px;")
+                    self.animate_success()
+                    self.login_success.emit(user_id)
+                else:
+                    self.message_label.setText("Incorrect username or password")
+                    self.message_label.setStyleSheet("color: #e74c3c; font-size: 16px;")
+                    self.animate_failure()
+            else:
+                self.message_label.setText("Incorrect username or password")
+                self.message_label.setStyleSheet("color: #e74c3c; font-size: 16px;")
+                self.animate_failure()
 
     def animate_success(self):
         self.animate_message()

@@ -20,12 +20,12 @@ class POSModule(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout()
-        
+
         # Estilo general mejorado
         self.setStyleSheet("""
             QWidget {
-                background-color: #f8f9fa;
-                color: #212529;
+                background-color: #f5f5f5;
+                color: #333333;
                 font-family: 'Segoe UI', Arial, sans-serif;
             }
             QPushButton {
@@ -41,21 +41,32 @@ class POSModule(QWidget):
             QPushButton:hover {
                 background-color: #0056b3;
             }
+            QPushButton:pressed {
+                background-color: #003d80;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
             QLineEdit, QComboBox, QDoubleSpinBox {
                 padding: 12px;
                 margin: 6px 0;
                 border: 1px solid #ced4da;
                 border-radius: 8px;
-                background-color: white;
+                background-color: #ffffff;
+                font-size: 14px;
+            }
+            QLineEdit:focus, QComboBox:focus, QDoubleSpinBox:focus {
+                border-color: #80bdff;
+                outline: none;
             }
             QTableWidget {
-                border: none;
+                border: 1px solid #dee2e6;
                 background-color: white;
             }
             QHeaderView::section {
-                background-color: #f8f9fa;
+                background-color: #e9ecef;
                 color: #495057;
-                padding: 12px;
+                padding: 10px;
                 border: none;
                 border-bottom: 2px solid #dee2e6;
                 font-weight: bold;
@@ -78,24 +89,24 @@ class POSModule(QWidget):
         # Header con título y logo
         header_layout = QHBoxLayout()
         logo_label = QLabel()
-        logo_label.setPixmap(QPixmap("icons/pos_logo.png").scaled(40, 40, Qt.AspectRatioMode.KeepAspectRatio))
+        logo_label.setPixmap(QPixmap("icons/add.png").scaled(40, 40, Qt.AspectRatioMode.KeepAspectRatio))
         header_layout.addWidget(logo_label)
-        
+
         title = QLabel("Sistema POS")
         title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         title.setStyleSheet("color: #007bff; margin-left: 10px;")
         header_layout.addWidget(title)
-        
+
         header_layout.addStretch()
-        
+
         # Botón de ayuda
         help_button = QPushButton(QIcon("icons/help.png"), "")
         help_button.setFixedSize(40, 40)
         help_button.setStyleSheet("background-color: transparent; border: none;")
         help_button.clicked.connect(self.show_help)
         header_layout.addWidget(help_button)
-        
+
         layout.addLayout(header_layout)
 
         # Línea separadora
@@ -125,15 +136,15 @@ class POSModule(QWidget):
         # Grupo de producto
         product_group = QGroupBox("Agregar producto")
         product_layout = QVBoxLayout()
-        
+
         self.product_search = QLineEdit()
         self.product_search.setPlaceholderText("Buscar producto...")
         product_layout.addWidget(self.product_search)
-        
+
         self.product_combo = QComboBox()
         self.product_combo.setPlaceholderText("Seleccionar producto")
         product_layout.addWidget(self.product_combo)
-        
+
         quantity_layout = QHBoxLayout()
         quantity_layout.addWidget(QLabel("Cantidad:"))
         self.quantity_input = QDoubleSpinBox()
@@ -141,12 +152,20 @@ class POSModule(QWidget):
         self.quantity_input.setValue(1)
         quantity_layout.addWidget(self.quantity_input)
         product_layout.addLayout(quantity_layout)
-        
+
         self.add_to_cart_button = QPushButton("Agregar al carrito")
         self.add_to_cart_button.setIcon(QIcon("icons/add_to_cart.png"))
+        self.add_to_cart_button.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
         self.add_to_cart_button.clicked.connect(self.add_to_cart)
         product_layout.addWidget(self.add_to_cart_button)
-        
+
         product_group.setLayout(product_layout)
         left_layout.addWidget(product_group)
 
@@ -173,13 +192,21 @@ class POSModule(QWidget):
             }
         """)
         cart_layout.addWidget(self.cart_table)
-        
+
         # Botón para eliminar productos del carrito
         self.remove_from_cart_button = QPushButton("Eliminar seleccionado")
         self.remove_from_cart_button.setIcon(QIcon("icons/remove.png"))
+        self.remove_from_cart_button.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
         self.remove_from_cart_button.clicked.connect(self.remove_from_cart)
         cart_layout.addWidget(self.remove_from_cart_button)
-        
+
         cart_group.setLayout(cart_layout)
         right_layout.addWidget(cart_group)
 
@@ -197,7 +224,7 @@ class POSModule(QWidget):
             font-weight: bold;
         """)
         self.complete_sale_button.clicked.connect(self.complete_sale)
-        
+
         total_layout.addWidget(self.total_label)
         total_layout.addWidget(self.complete_sale_button)
         right_layout.addLayout(total_layout)
@@ -218,6 +245,7 @@ class POSModule(QWidget):
 
         # Implementar atajos de teclado
         self.add_shortcuts()
+
 
     def add_tooltips(self):
         self.customer_combo.setToolTip("Buscar o seleccionar un cliente")
@@ -412,30 +440,33 @@ class POSModule(QWidget):
 
         customer_id = self.customer_combo.currentData()
         if not customer_id:
-            self.show_error_animation(self.customer_combo)
-            QMessageBox.warning(self, "Error", "Por favor, seleccione un cliente.")
-            return
+            # Asignar cliente "variado" por defecto
+            customer_id = self.get_or_create_default_customer()
 
         try:
             conn = sqlite3.connect('pos_database.db')
             c = conn.cursor()
 
-            # Crear la venta
-            c.execute("INSERT INTO ventas (cliente_id, fecha) VALUES (?, datetime('now'))", (customer_id,))
+            # Calcular el total de la venta
+            total_venta = sum(float(self.cart_table.item(row, 4).text().replace('$', '')) for row in range(self.cart_table.rowCount()))
+
+            # Crear la venta con el total calculado
+            c.execute("INSERT INTO ventas (cliente_id, fecha, total) VALUES (?, datetime('now'), ?)", (customer_id, total_venta))
             sale_id = c.lastrowid
 
             # Agregar detalles de la venta
             for row in range(self.cart_table.rowCount()):
                 product_id = int(self.cart_table.item(row, 0).text())
                 quantity = float(self.cart_table.item(row, 3).text())
-                price = float(self.cart_table.item(row, 2).text().replace('$', ''))
+                price_unitario = float(self.cart_table.item(row, 2).text().replace('$', ''))
+                precio_total = quantity * price_unitario
 
                 c.execute("""
-                    INSERT INTO detalles_venta (venta_id, producto_id, cantidad, precio_unitario)
-                    VALUES (?, ?, ?, ?)
-                """, (sale_id, product_id, quantity, price))
+                    INSERT INTO detalles_venta (venta_id, producto_id, cantidad, precio_unitario, precio)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (sale_id, product_id, quantity, price_unitario, precio_total))
 
-                # Actualizar el stock
+                # Actualizar el stock del producto
                 c.execute("UPDATE productos SET stock = stock - ? WHERE id = ?", (quantity, product_id))
 
             conn.commit()
@@ -449,6 +480,26 @@ class POSModule(QWidget):
 
         except sqlite3.Error as e:
             QMessageBox.critical(self, "Error", f"No se pudo completar la venta: {e}")
+
+    def get_or_create_default_customer(self):
+        conn = sqlite3.connect('pos_database.db')
+        c = conn.cursor()
+        
+        # Buscar el cliente "variado"
+        c.execute("SELECT id FROM clientes WHERE nombre = 'variado'")
+        result = c.fetchone()
+        
+        if result:
+            default_customer_id = result[0]
+        else:
+            # Crear el cliente "variado" si no existe
+            c.execute("INSERT INTO clientes (nombre) VALUES ('variado')")
+            default_customer_id = c.lastrowid
+            conn.commit()
+        
+        conn.close()
+        return default_customer_id
+
 
     def show_error_animation(self, widget):
         animation = QPropertyAnimation(widget, b"styleSheet")

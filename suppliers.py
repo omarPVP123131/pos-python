@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QDialog,
-    QFormLayout, QDialogButtonBox, QApplication
+    QFormLayout, QDialogButtonBox, QApplication, QFrame, QSplitter
 )
 from PyQt6.QtGui import QFont, QColor, QIcon
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -17,8 +17,7 @@ class SuppliersModule(QWidget):
         self.load_suppliers()
 
     def init_ui(self):
-        layout = QVBoxLayout()
-        #colores                 #4a90e2 #357ae8;
+        main_layout = QHBoxLayout(self)
 
         # Estilo general
         self.setStyleSheet("""
@@ -59,17 +58,29 @@ class SuppliersModule(QWidget):
                 border: 1px solid #357ae8;
             }
         """)
+        
+        # Ajustar el espaciado entre widgets y márgenes generales del layout
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
+
+        # Panel izquierdo
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setSpacing(15)  # Espaciado entre widgets en el panel izquierdo
 
         # Título
         title = QLabel("Gestión de Proveedores")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-        title.setStyleSheet("color: #4a90e2; margin: 10px 0;")
-        layout.addWidget(title)
+        title.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
+        title.setStyleSheet("color: #3498DB; margin: 20px 0;")
+        left_layout.addWidget(title)
 
         # Formulario de entrada
-        form_layout = QHBoxLayout()
-        
+        form_widget = QWidget()
+        form_layout = QFormLayout(form_widget)
+        form_layout.setSpacing(10)  # Espaciado entre campos del formulario
+        form_layout.setContentsMargins(0, 10, 0, 10)
+
         self.supplier_name_input = QLineEdit()
         self.supplier_name_input.setPlaceholderText("Nombre del proveedor")
         self.supplier_contact_input = QLineEdit()
@@ -78,51 +89,134 @@ class SuppliersModule(QWidget):
         self.supplier_phone_input.setPlaceholderText("Teléfono")
         self.supplier_email_input = QLineEdit()
         self.supplier_email_input.setPlaceholderText("Email")
-        
+
+        form_layout.addRow("Nombre:", self.supplier_name_input)
+        form_layout.addRow("Contacto:", self.supplier_contact_input)
+        form_layout.addRow("Teléfono:", self.supplier_phone_input)
+        form_layout.addRow("Email:", self.supplier_email_input)
+
+        left_layout.addWidget(form_widget)
+
+        # Espacio entre el formulario y los botones
+        left_layout.addSpacing(10)
+
+        # Botones de acción
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)  # Espaciado entre botones
+
         self.add_supplier_button = QPushButton("Agregar proveedor")
         self.add_supplier_button.setIcon(QIcon("icons/add.png"))
         self.add_supplier_button.clicked.connect(self.add_supplier)
 
-        form_layout.addWidget(self.supplier_name_input)
-        form_layout.addWidget(self.supplier_contact_input)
-        form_layout.addWidget(self.supplier_phone_input)
-        form_layout.addWidget(self.supplier_email_input)
-        form_layout.addWidget(self.add_supplier_button)
+        self.clear_form_button = QPushButton("Limpiar formulario")
+        self.clear_form_button.setIcon(QIcon("icons/clear.png"))
+        self.clear_form_button.clicked.connect(self.clear_form)
 
-        layout.addLayout(form_layout)
+        button_layout.addWidget(self.add_supplier_button)
+        button_layout.addWidget(self.clear_form_button)
+
+        left_layout.addLayout(button_layout)
+
+        # Espacio adicional antes del frame de estadísticas
+        left_layout.addSpacing(20)
+
+        # Estadísticas de proveedores
+        stats_frame = QFrame()
+        stats_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        stats_frame.setStyleSheet("background-color: #2C3E50; padding: 10px; border-radius: 5px;")
+        stats_layout = QVBoxLayout(stats_frame)
+        stats_layout.setSpacing(5)
+
+        self.total_suppliers_label = QLabel("Total de proveedores: 0")
+        self.total_suppliers_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.total_suppliers_label.setFont(QFont("Segoe UI", 12))
+        self.total_suppliers_label.setStyleSheet("color: #ECF0F1;")
+        stats_layout.addWidget(self.total_suppliers_label)
+
+        left_layout.addWidget(stats_frame)
+
+        # Espacio adicional para empujar los elementos hacia arriba
+        left_layout.addStretch(1)
+
+        # Panel derecho
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setSpacing(15)
+
+        # Barra de búsqueda
+        search_layout = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Buscar proveedores...")
+        self.search_input.textChanged.connect(self.search_suppliers)
+        search_layout.addWidget(self.search_input)
+
+        right_layout.addLayout(search_layout)
 
         # Tabla de proveedores
         self.supplier_table = QTableWidget(0, 5)
         self.supplier_table.setHorizontalHeaderLabels(["ID", "Nombre", "Contacto", "Teléfono", "Email"])
+        
+        # Deshabilitar edición directa
+        self.supplier_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        
+        # Mejorar los encabezados
         self.supplier_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.supplier_table.horizontalHeader().setStyleSheet("""
+            QHeaderView::section {
+                background-color: #4CAF50;  /* Fondo de los encabezados */
+                color: white;
+                padding: 10px;
+                font-size: 14px;
+                border: 1px solid #ddd;
+            }
+        """)
+        
+        # Alternar colores de las filas y otros estilos visuales
         self.supplier_table.setAlternatingRowColors(True)
         self.supplier_table.setStyleSheet("""
             QTableWidget {
-                gridline-color: #d6d9dc;
-                selection-background-color: #e2e8f0;
+                gridline-color: #BFBFBF;
+                background-color: #f9f9f9;  /* Color de fondo de la tabla */
+                alternate-background-color: #F2F2F2;  /* Color de fondo alternado */
             }
             QTableWidget::item {
-                padding: 5px;
+                padding: 8px;  /* Mejorar el espaciado en las celdas */
+                border-bottom: 1px solid #ddd;
+            }
+            QTableWidget::item:selected {
+                background-color: #3399FF;  /* Color de selección */
+                color: white;
             }
         """)
-        layout.addWidget(self.supplier_table)
 
-        # Botones de acción
-        button_layout = QHBoxLayout()
+        right_layout.addWidget(self.supplier_table)
+
+        # Botones de acción para la tabla
+        table_button_layout = QHBoxLayout()
+        table_button_layout.setSpacing(10)  # Espaciado entre los botones de la tabla
+
         self.edit_supplier_button = QPushButton("Editar proveedor")
         self.edit_supplier_button.setIcon(QIcon("icons/edit.png"))
         self.edit_supplier_button.clicked.connect(self.edit_supplier)
+
         self.delete_supplier_button = QPushButton("Eliminar proveedor")
         self.delete_supplier_button.setIcon(QIcon("icons/delete.png"))
         self.delete_supplier_button.clicked.connect(self.delete_supplier)
 
-        button_layout.addWidget(self.edit_supplier_button)
-        button_layout.addWidget(self.delete_supplier_button)
+        table_button_layout.addWidget(self.edit_supplier_button)
+        table_button_layout.addWidget(self.delete_supplier_button)
 
-        layout.addLayout(button_layout)
+        right_layout.addLayout(table_button_layout)
 
-        self.setLayout(layout)
+        # Agregar paneles al diseño principal usando QSplitter
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(left_panel)
+        splitter.addWidget(right_panel)
 
+        # Ajustar tamaños iniciales de los paneles
+        splitter.setSizes([300, 500])  # Panel izquierdo 300px, derecho 500px
+
+        main_layout.addWidget(splitter)
     def add_supplier(self):
         name = self.supplier_name_input.text()
         contact = self.supplier_contact_input.text()
@@ -130,7 +224,7 @@ class SuppliersModule(QWidget):
         email = self.supplier_email_input.text()
 
         if not name:
-            QMessageBox.warning(self, "Error", "Por favor, ingrese un nombre de proveedor.")
+            QMessageBox.critical(self, 'Error', "Por favor, ingrese un nombre de proveedor.")
             return
 
         try:
@@ -141,16 +235,13 @@ class SuppliersModule(QWidget):
             conn.commit()
             conn.close()
 
-            self.supplier_name_input.clear()
-            self.supplier_contact_input.clear()
-            self.supplier_phone_input.clear()
-            self.supplier_email_input.clear()
+            self.clear_form()
             self.load_suppliers()
             self.supplier_updated.emit()
 
-            QMessageBox.information(self, "Éxito", "Proveedor agregado correctamente.")
+            QMessageBox.information(self, 'Éxito', "Proveedor agregado correctamente.")
         except sqlite3.Error as e:
-            QMessageBox.critical(self, "Error", f"No se pudo agregar el proveedor: {e}")
+            QMessageBox.critical(self, 'Error', f"No se pudo agregar el proveedor: {e}")
 
     def load_suppliers(self):
         try:
@@ -169,13 +260,15 @@ class SuppliersModule(QWidget):
                         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     self.supplier_table.setItem(row, col, item)
 
+            self.total_suppliers_label.setText(f"Total de proveedores: {len(suppliers)}")
+
         except sqlite3.Error as e:
-            QMessageBox.critical(self, "Error", f"No se pudieron cargar los proveedores: {e}")
+            QMessageBox.critical(self, 'Error', f"No se pudieron cargar los proveedores: {e}")
 
     def edit_supplier(self):
         selected_items = self.supplier_table.selectedItems()
         if not selected_items:
-            QMessageBox.warning(self, "Advertencia", "Por favor, seleccione un proveedor para editar.")
+            QMessageBox.warning(self, 'Advertencia', "Por favor, seleccione un proveedor para editar.")
             return
 
         row = selected_items[0].row()
@@ -199,12 +292,8 @@ class SuppliersModule(QWidget):
         layout.addRow("Teléfono:", phone_input)
         layout.addRow("Email:", email_input)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
-            Qt.Orientation.Horizontal,
-            dialog
-        )
-        layout.addRow(buttons)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        layout.addWidget(buttons)
 
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
@@ -227,25 +316,21 @@ class SuppliersModule(QWidget):
                 conn.close()
 
                 self.load_suppliers()
-                self.supplier_updated.emit()
-                QMessageBox.information(self, "Éxito", "Proveedor actualizado correctamente.")
+                QMessageBox.information(self, 'Éxito', "Proveedor actualizado correctamente.")
             except sqlite3.Error as e:
-                QMessageBox.critical(self, "Error", f"No se pudo actualizar el proveedor: {e}")
+                QMessageBox.critical(self, 'Error', f"No se pudo actualizar el proveedor: {e}")
 
     def delete_supplier(self):
         selected_items = self.supplier_table.selectedItems()
         if not selected_items:
-            QMessageBox.warning(self, "Advertencia", "Por favor, seleccione un proveedor para eliminar.")
+            QMessageBox.warning(self, 'Advertencia', "Por favor, seleccione un proveedor para eliminar.")
             return
 
         row = selected_items[0].row()
         supplier_id = int(self.supplier_table.item(row, 0).text())
-        supplier_name = self.supplier_table.item(row, 1).text()
 
-        reply = QMessageBox.question(self, "Confirmar eliminación",
-                                     f"¿Está seguro de que desea eliminar el proveedor '{supplier_name}'?",
+        reply = QMessageBox.question(self, 'Confirmación', "¿Está seguro de que desea eliminar este proveedor?",
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 conn = sqlite3.connect('pos_database.db')
@@ -255,13 +340,26 @@ class SuppliersModule(QWidget):
                 conn.close()
 
                 self.load_suppliers()
-                self.supplier_updated.emit()
-                QMessageBox.information(self, "Éxito", "Proveedor eliminado correctamente.")
+                QMessageBox.information(self, 'Éxito', "Proveedor eliminado correctamente.")
             except sqlite3.Error as e:
-                QMessageBox.critical(self, "Error", f"No se pudo eliminar el proveedor: {e}")
+                QMessageBox.critical(self, 'Error', f"No se pudo eliminar el proveedor: {e}")
 
-if __name__ == '__main__':
+    def clear_form(self):
+        self.supplier_name_input.clear()
+        self.supplier_contact_input.clear()
+        self.supplier_phone_input.clear()
+        self.supplier_email_input.clear()
+
+    def search_suppliers(self, query):
+        for row in range(self.supplier_table.rowCount()):
+            supplier_name = self.supplier_table.item(row, 1).text().lower()
+            if query.lower() in supplier_name:
+                self.supplier_table.setRowHidden(row, False)
+            else:
+                self.supplier_table.setRowHidden(row, True)
+
+if __name__ == "__main__":
     app = QApplication(sys.argv)
-    suppliers_module = SuppliersModule()
-    suppliers_module.show()
+    window = SuppliersModule()
+    window.show()
     sys.exit(app.exec())

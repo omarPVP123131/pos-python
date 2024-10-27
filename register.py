@@ -1,13 +1,14 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox,
-    QHBoxLayout, QFrame, QProgressBar
+    QHBoxLayout, QFrame, QProgressBar, QSizePolicy, QCheckBox, QDialog, QTextEdit
 )
-from PyQt6.QtCore import pyqtSignal, Qt, QPropertyAnimation, QEasingCurve, QSize
+from PyQt6.QtCore import pyqtSignal, Qt, QPropertyAnimation, QEasingCurve, QSize, QTimer
 from PyQt6.QtGui import QColor, QFont, QPainter, QLinearGradient, QIcon
 import sqlite3
 import bcrypt
 from datetime import datetime
 import re
+import json
 
 class GradientWidget(QWidget):
     def __init__(self, start_color, end_color, *args, **kwargs):
@@ -79,27 +80,7 @@ class PasswordStrengthBar(QProgressBar):
                 border-radius: 2px;
             }
         """)
-        
-class BackArrowButton(QPushButton):
-    def __init__(self, callback):
-        super().__init__()
-        self.setIcon(QIcon("icons/flecha.png"))  # Ruta al ícono de flecha
-        self.setIconSize(QSize(30, 30))
-        self.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                border: none;
-                margin: 10px;
-            }
-            QPushButton:hover {
-                background-color: rgba(0, 0, 0, 0.1);
-                border-radius: 15px;
-            }
-        """)
-        self.clicked.connect(callback)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-
-
+    
     def update_strength(self, password):
         strength = 0
         if len(password) >= 8:
@@ -125,8 +106,49 @@ class BackArrowButton(QPushButton):
                 QProgressBar::chunk { background-color: #2ecc71; }
             """)
 
+class BackArrowButton(QPushButton):
+    def __init__(self):
+        super().__init__()
+        self.setIcon(QIcon("icons/flecha.png"))
+        self.setIconSize(QSize(24, 24))
+        self.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 0, 0, 0.1);
+                border-radius: 12px;
+            }
+        """)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+class TermsAndConditionsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Términos y Condiciones")
+        self.setFixedSize(600, 400)
+
+        layout = QVBoxLayout()
+        
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        
+        with open("terms_and_conditions.json", "r", encoding="utf-8") as file:
+            terms = json.load(file)
+            text_edit.setPlainText(terms["content"])
+        
+        layout.addWidget(text_edit)
+        
+        close_button = QPushButton("Cerrar")
+        close_button.clicked.connect(self.accept)
+        layout.addWidget(close_button)
+        
+        self.setLayout(layout)
+
 class RegisterModule(QWidget):
     registro_exitoso = pyqtSignal()
+    regresar_signal = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -134,15 +156,11 @@ class RegisterModule(QWidget):
 
     def initUI(self):
         main_layout = QHBoxLayout(self)
-        
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-        
-        # Left side - Gradient background
         left_widget = GradientWidget(QColor("#3498db"), QColor("#2c3e50"))
         left_widget.setFixedWidth(300)
-                # Back arrow button
-        back_button = BackArrowButton(self.regresar)
-        main_layout.addWidget(back_button, alignment=Qt.AlignmentFlag.AlignLeft)
         left_layout = QVBoxLayout(left_widget)
         left_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -159,12 +177,15 @@ class RegisterModule(QWidget):
 
         main_layout.addWidget(left_widget)
 
-        # Right side - Registration form
         right_widget = QWidget()
         right_widget.setStyleSheet("background-color: white;")
         right_layout = QVBoxLayout(right_widget)
         right_layout.setSpacing(15)
         right_layout.setContentsMargins(40, 40, 40, 40)
+
+        back_button = BackArrowButton()
+        back_button.clicked.connect(self.regresar)
+        right_layout.addWidget(back_button, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.txt_username = ModernLineEdit("Nombre de usuario")
         right_layout.addWidget(self.txt_username)
@@ -183,6 +204,39 @@ class RegisterModule(QWidget):
         self.txt_confirm_password = ModernLineEdit("Confirmar contraseña")
         self.txt_confirm_password.setEchoMode(QLineEdit.EchoMode.Password)
         right_layout.addWidget(self.txt_confirm_password)
+
+        terms_layout = QHBoxLayout()
+        self.terms_checkbox = QCheckBox("Acepto los")
+        self.terms_checkbox.setStyleSheet("""
+            QCheckBox {
+                font-size: 14px;
+            }
+            QCheckBox::indicator {
+                width: 20px;
+                height: 20px;
+            }
+        """)
+        terms_layout.addWidget(self.terms_checkbox)
+
+        terms_button = QPushButton("términos y condiciones")
+        terms_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #3498db;
+                border: none;
+                text-decoration: underline;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                color: #2980b9;
+            }
+        """)
+        terms_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        terms_button.clicked.connect(self.show_terms_and_conditions)
+        terms_layout.addWidget(terms_button)
+        terms_layout.addStretch()
+
+        right_layout.addLayout(terms_layout)
 
         self.btn_registrar = ModernButton("Registrar")
         self.btn_registrar.clicked.connect(self.registrar_usuario)
@@ -220,7 +274,10 @@ class RegisterModule(QWidget):
             self.show_message("La contraseña es demasiado débil. Por favor, elija una contraseña más fuerte.", error=True)
             return
 
-        # Encriptar la contraseña
+        if not self.terms_checkbox.isChecked():
+            self.show_message("Debe aceptar los términos y condiciones.", error=True)
+            return
+
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
         conn = sqlite3.connect("pos_database.db")
@@ -243,7 +300,6 @@ class RegisterModule(QWidget):
         color = "#e74c3c" if error else "#2ecc71"
         self.message_label.setStyleSheet(f"color: {color}; font-size: 14px;")
         
-        # Animate the message
         animation = QPropertyAnimation(self.message_label, b"opacity")
         animation.setDuration(300)
         animation.setStartValue(0)
@@ -261,6 +317,11 @@ class RegisterModule(QWidget):
         self.txt_confirm_password.clear()
         self.txt_email.clear()
         self.password_strength_bar.setValue(0)
-        
+        self.terms_checkbox.setChecked(False)
+
     def regresar(self):
-        print("hola")
+        self.regresar_signal.emit()
+
+    def show_terms_and_conditions(self):
+        dialog = TermsAndConditionsDialog(self)
+        dialog.exec()
